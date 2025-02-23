@@ -1,11 +1,40 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserWarning } from './UserWarning';
-import { USER_ID } from './api/todos';
+import * as todosService from './api/todos';
+import { Todo } from './types/Todo';
+import classNames from 'classnames';
 
 export const App: React.FC = () => {
-  if (!USER_ID) {
+  const [creatNewTodos, setCreateNewTodos] = useState('');
+  const [dataFromServer, setDataFromServer] = useState<Todo[]>([]);
+  const [error, setError] = useState('');
+  const userId = todosService.USER_ID;
+  const [controlChecked, setControlChecked] = useState<number[]>([]);
+
+  useEffect(() => {
+    todosService
+      .getTodos()
+      .then(setDataFromServer)
+      .catch(() => setError('Your error message'));
+  }, []);
+
+  function handleForm(event: React.FormEvent) {
+    event.preventDefault();
+
+    const newTodo: Omit<Todo, 'id'> = {
+      userId,
+      title: creatNewTodos,
+      completed: false,
+    };
+
+    todosService.createPost(newTodo).then(createdTodo => {
+      setDataFromServer(prevPost => [...prevPost, createdTodo]);
+    });
+  }
+
+  if (!todosService.USER_ID) {
     return <UserWarning />;
   }
 
@@ -23,43 +52,67 @@ export const App: React.FC = () => {
           />
 
           {/* Add a todo on form submit */}
-          <form>
+          <form onSubmit={handleForm}>
             <input
+              autoFocus
               data-cy="NewTodoField"
               type="text"
               className="todoapp__new-todo"
               placeholder="What needs to be done?"
+              value={creatNewTodos}
+              onChange={event => {
+                setCreateNewTodos(event.target.value);
+              }}
             />
           </form>
         </header>
 
         <section className="todoapp__main" data-cy="TodoList">
           {/* This is a completed todo */}
-          <div data-cy="Todo" className="todo completed">
-            <label className="todo__status-label">
-              <input
-                data-cy="TodoStatus"
-                type="checkbox"
-                className="todo__status"
-                checked
-              />
-            </label>
 
-            <span data-cy="TodoTitle" className="todo__title">
-              Completed Todo
-            </span>
+          {dataFromServer.map(item => (
+            <>
+              <div
+                data-cy="Todo"
+                key={item.id}
+                className={classNames('todo', {
+                  completed: controlChecked.includes(item.id),
+                })}
+              >
+                <label
+                  className="todo__status-label"
+                  onClick={() => {
+                    setControlChecked([item.id]);
+                  }}
+                >
+                  <input
+                    data-cy="TodoStatus"
+                    type="checkbox"
+                    className="todo__status"
+                    checked={controlChecked}
+                  />
+                </label>
 
-            {/* Remove button appears only on hover */}
-            <button type="button" className="todo__remove" data-cy="TodoDelete">
-              ×
-            </button>
+                <span data-cy="TodoTitle" className="todo__title">
+                  {item.title}
+                </span>
+                {/* Remove button appears only on hover */}
+                <button
+                  type="button"
+                  className="todo__remove"
+                  data-cy="TodoDelete"
+                >
+                  ×
+                </button>
 
-            {/* overlay will cover the todo while it is being deleted or updated */}
-            <div data-cy="TodoLoader" className="modal overlay">
-              <div className="modal-background has-background-white-ter" />
-              <div className="loader" />
-            </div>
-          </div>
+                {/* overlay will cover the todo while it is being deleted or updated is-active*/}
+                <div data-cy="TodoLoader" className="modal overlay">
+                  <div className="modal-background has-background-white-ter" />
+                  <div className="loader" />
+                </div>
+              </div>
+            </>
+          ))}
 
           {/* This todo is an active todo */}
           <div data-cy="Todo" className="todo">
